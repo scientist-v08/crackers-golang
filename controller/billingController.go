@@ -1,0 +1,192 @@
+package controller
+
+import (
+	"bytes"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jung-kurt/gofpdf"
+	"github.com/scientist-v08/crackers/model"
+	"gorm.io/gorm"
+)
+
+// ---------- Front-end interfaces (mirrored in Go) ----------
+type Item struct {
+	SlNo     int     `json:"slNo"`
+	Item     string  `json:"item" binding:"required"`
+	MRPOrNet float64 `json:"mrpOrNet" binding:"required,gt=0"`
+	Quantity int     `json:"quantity" binding:"required,gt=0"`
+	Discount string  `json:"discount"`
+	SubTotal float64 `json:"subTotal" binding:"required,gt=0"`
+}
+
+type BillDetails struct {
+	User       string  `json:"user" binding:"required"`
+	Mobile     string  `json:"mobile" binding:"required"`
+	GrandTotal float64 `json:"grandTotal" binding:"required,gt=0"`
+	BillItems  []Item  `json:"billItems" binding:"required,min=1"`
+}
+
+// ---------- Helper: convert float → int32 (cents) ----------
+func toCents(v float64) int32 {
+	return int32(v)
+}
+
+// ---------- Generate PDF ----------
+func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
+	f := gofpdf.New("P", "mm", "A4", "")
+	f.AddPage()
+	f.SetFont("Arial", "B", 16)
+
+	// Heading
+	title := "Vinayaka Traders"
+	f.CellFormat(190, 10, title, "", 1, "C", false, 0, "")
+	f.Ln(20)
+
+	// Flex-like section
+	y := f.GetY()
+
+	// Left div: Customer details
+	f.SetFont("Arial", "", 12)
+	f.SetXY(10, y)
+	customerText := fmt.Sprintf("Customer: %s\nMobile: %s\nBill ID: %d", bill.User, bill.Mobile, billID)
+	f.MultiCell(90, 5, customerText, "", "L", false)
+	yLeft := f.GetY()
+
+	// Right div: Terms
+	f.SetXY(110, y)
+	termsText := "Terms: Quality not guaranteed by retailer. Contact brand for complaints."
+	f.MultiCell(80, 6, termsText, "", "L", false)
+	yRight := f.GetY()
+
+	// Move to the bottom of the taller section
+	maxY := yLeft
+	if yRight > maxY {
+		maxY = yRight
+	}
+	f.SetY(maxY)
+
+	// Table headers
+	f.SetFont("Arial", "B", 12)
+	headers := []string{"SlNo", "Item", "MRP/Net", "Quantity", "Discount", "SubTotal"}
+	colWidths := []float64{15, 65, 25, 20, 25, 30}
+	for i, h := range headers {
+		f.CellFormat(colWidths[i], 10, h, "1", 0, "C", false, 0, "")
+	}
+	f.Ln(-1)
+
+	// Table rows
+	f.SetFont("Arial", "", 11)
+	for _, item := range bill.BillItems {
+		f.CellFormat(15, 8, strconv.Itoa(item.SlNo), "1", 0, "C", false, 0, "")
+		f.CellFormat(65, 8, item.Item, "1", 0, "L", false, 0, "")
+		f.CellFormat(25, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "R", false, 0, "")
+		f.CellFormat(20, 8, strconv.Itoa(item.Quantity), "1", 0, "C", false, 0, "")
+		f.CellFormat(25, 8, item.Discount, "1", 0, "C", false, 0, "")
+		f.CellFormat(30, 8, fmt.Sprintf("%.2f", item.SubTotal), "1", 0, "R", false, 0, "")
+		f.Ln(-1)
+	}
+
+	// Grand total
+	f.Ln(5)
+	f.SetFont("Arial", "B", 12)
+	f.CellFormat(150, 12, "Grand Total:", "T", 0, "R", false, 0, "")
+	f.CellFormat(30, 12, fmt.Sprintf("%.2f", bill.GrandTotal), "T", 0, "R", false, 0, "")
+
+	if err := f.Error(); err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err := f.Output(&buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ---------- Gin handler ----------
+func CreateBillHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req BillDetails
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var createdBillingID uint
+		// ---- Transaction ----
+		errTrn := db.Transaction(func(tx *gorm.DB) error {
+
+			// 1. Insert Billing row
+			billing := model.Billing{
+				User:       req.User,
+				Mobile:     req.Mobile,
+				GrandTotal: toCents(req.GrandTotal),
+			}
+			if errBilling := tx.Create(&billing).Error; errBilling != nil {
+				return errBilling
+			}
+			createdBillingID = billing.ID
+			
+			// 2. Insert each item as a Purchases row
+			var purchases []model.Purchases
+			for _, it := range req.BillItems {
+				purchases = append(purchases, model.Purchases{
+					BillingID: billing.ID,
+					Mobile:    req.Mobile,
+					MrpOrNet:  toCents(it.MRPOrNet),
+					Item:      it.Item,
+					Quantity:  int32(it.Quantity),
+					Discount:  it.Discount,
+					SubTotal:  toCents(it.SubTotal),
+				})
+			}
+			if errBulk := tx.Create(&purchases).Error; errBulk != nil {
+				return errBulk
+			}
+			return nil
+		})
+
+		if errTrn != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errTrn.Error()})
+			return
+		}
+
+		// Generate PDF
+		pdfBytes, errPdf := generatePDF(req, createdBillingID)
+		if errPdf != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errPdf.Error()})
+			return
+		}
+
+		// Send PDF in response
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="bill_%d.pdf"`, createdBillingID))
+		c.Data(http.StatusCreated, "application/pdf", pdfBytes)
+	}
+}
+
+func CreatePreviewBillHandler(c *gin.Context) {
+	var req BillDetails
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.User = "NA--PREVIEW"
+	req.Mobile = "NA--PREVIEW"
+	// Generate PDF
+	pdfBytes, errPdf := generatePDF(req, 0)
+	if errPdf != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errPdf.Error()})
+		return
+	}
+
+	// Send PDF in response
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	nowIST := time.Now().In(loc)
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="bill_preview_%s.pdf"`, nowIST))
+	c.Data(http.StatusCreated, "application/pdf", pdfBytes)
+}
