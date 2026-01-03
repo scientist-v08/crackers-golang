@@ -1,4 +1,4 @@
-# Upsales Golang Backend
+# Vinayaka Crackers Golang Backend
 
 ## Getting Started
 
