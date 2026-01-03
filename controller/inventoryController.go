@@ -245,7 +245,6 @@ func UpdateInventory(db *gorm.DB) gin.HandlerFunc {
 			updateExisting := model.Inventory{
 				NumOfCartons: difference,
 				SubTotal:     newExistingSubTotal,
-				State:        nextState,
 			}
 
 			if err := tx.Model(&existing).Updates(updateExisting).Error; err != nil {
