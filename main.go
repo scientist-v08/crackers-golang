@@ -10,8 +10,16 @@ import (
 	"github.com/scientist-v08/crackers/routes"
 )
 
+func setGinMode() {
+	// Set GIN MODE
+	if mode := os.Getenv("GIN_MODE"); mode != "" {
+		gin.SetMode(mode)
+	}
+}
+
 func init() {
 	initializers.LoadEnvVariables()
+	setGinMode()
 	initializers.ConnectToDb()
 }
 
