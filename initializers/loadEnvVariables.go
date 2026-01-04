@@ -8,17 +8,12 @@ import (
 )
 
 func LoadEnvVariables() {
-	env := os.Getenv("APP_ENV")
-	file := ".env"
-
-	switch env {
-		case "production":
-			file = ".env.production"
-		case "staging":
-			file = ".env.staging"
+	if os.Getenv("APP_ENV") == "production" {
+		log.Println("Production mode: using system environment variables")
+		return
 	}
-	err := godotenv.Load(file)
-	if err != nil {
-		log.Fatal("Error loading .env file")
+
+	if err := godotenv.Load(".env"); err != nil {
+		log.Println("No .env file found, using system environment variables")
 	}
 }
