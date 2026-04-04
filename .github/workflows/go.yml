@@ -5,9 +5,11 @@ name: Go
 
 on:
   push:
-    branches: [ "develop" ]
+    branches-ignore:
+      - 'develop'
   pull_request:
-    branches: [ "develop" ]
+    branches-ignore:
+      - 'develop'
 
 jobs:
 
