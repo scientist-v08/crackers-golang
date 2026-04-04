@@ -9,4 +9,5 @@ type Billing struct {
 	User         	string
 	Mobile			string
 	GrandTotal      int32
+	FinalizedAmt    int32
 }

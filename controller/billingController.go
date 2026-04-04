@@ -24,10 +24,11 @@ type Item struct {
 }
 
 type BillDetails struct {
-	User       string  `json:"user" binding:"required"`
-	Mobile     string  `json:"mobile" binding:"required"`
-	GrandTotal float64 `json:"grandTotal" binding:"required,gt=0"`
-	BillItems  []Item  `json:"billItems" binding:"required,min=1"`
+	User       	 string  `json:"user" binding:"required"`
+	Mobile     	 string  `json:"mobile" binding:"required"`
+	GrandTotal 	 float64 `json:"grandTotal" binding:"required,gt=0"`
+	FinalizedAmt int32 `json:"finalizedAmt"`
+	BillItems    []Item  `json:"billItems" binding:"required,min=1"`
 }
 
 // ---------- Helper: convert float → int32 (cents) ----------
@@ -91,10 +92,18 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 	}
 
 	// Grand total
-	f.Ln(5)
+	f.Ln(8)
 	f.SetFont("Arial", "B", 12)
-	f.CellFormat(150, 12, "Grand Total:", "T", 0, "R", false, 0, "")
-	f.CellFormat(30, 12, fmt.Sprintf("%.2f", bill.GrandTotal), "T", 0, "R", false, 0, "")
+	f.CellFormat(150, 10, "Grand Total:", "", 0, "R", false, 0, "")
+	f.CellFormat(40, 10, fmt.Sprintf("%.2f", bill.GrandTotal), "", 0, "R", false, 0, "")
+	f.Ln(4)
+
+	// Finalized Amount
+	if bill.FinalizedAmt > 0 {
+		f.SetFont("Arial", "B", 13)  // slightly bigger for emphasis
+		f.CellFormat(150, 12, "Finalized Amount:", "", 0, "R", false, 0, "")
+		f.CellFormat(40, 12, fmt.Sprintf("%d", bill.FinalizedAmt), "", 0, "R", false, 0, "")
+	}
 
 	if err := f.Error(); err != nil {
 		return nil, err
@@ -126,6 +135,7 @@ func CreateBillHandler(db *gorm.DB) gin.HandlerFunc {
 				User:       req.User,
 				Mobile:     req.Mobile,
 				GrandTotal: toCents(req.GrandTotal),
+				FinalizedAmt: req.FinalizedAmt,
 			}
 			if errBilling := tx.Create(&billing).Error; errBilling != nil {
 				return errBilling
