@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/scientist-v08/crackers/initializers"
@@ -12,6 +14,27 @@ import (
 type ExpenseReqBody struct {
 	ReasonForExpense string `json:"reasonForExpense"`
 	Amount           int32  `json:"amount"`
+}
+
+var (
+	ErrReasonTooShort = "reasonForExpense must be at least 5 characters long after trimming spaces"
+	ErrAmountTooLow   = "amount must be at least 10"
+)
+
+func validateExpenseRequest(req *ExpenseReqBody) error {
+
+	// Validate ReasonForExpense: trim and check minimum length 5
+	trimmedReason := strings.TrimSpace(req.ReasonForExpense)
+	if len(trimmedReason) < 5 {
+		return fmt.Errorf("%s", ErrReasonTooShort)
+	}
+
+	// Validate Amount: must be at least 10
+	if req.Amount < 10 {
+		return fmt.Errorf("%s", ErrAmountTooLow)
+	}
+
+	return nil
 }
 
 // ---------- Gin Handler -------------
@@ -26,19 +49,27 @@ func CreateExpense(c *gin.Context) {
 		return
 	}
 
-	// 2. Map to actual Expense model
+	// 2. Validate the data inputs.
+	if err := validateExpenseRequest(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// 3. Map to actual Expense model
 	expense := model.Expense{
 		ReasonForExpense: req.ReasonForExpense,
 		Amount:           req.Amount,
 	}
 
-	// 3. Save the data in the DB
+	// 4. Save the data in the DB
 	if err := initializers.DB.Create(&expense).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save the data in the DB"})
 		return
 	}
 
-	// 4. Send success message
+	// 5. Send success message
 	c.JSON(http.StatusCreated, gin.H{"Success": "Item saved to inventory"})
 }
 
