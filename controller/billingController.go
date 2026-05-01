@@ -72,22 +72,40 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 
 	// Table headers
 	f.SetFont("Arial", "B", 12)
-	headers := []string{"SlNo", "Item", "MRP/Net", "Quantity", "Discount", "SubTotal"}
-	colWidths := []float64{15, 65, 25, 20, 25, 30}
+	headers := []string{"SlNo", "Item", "MRP/Net", "Quantity", "Discount", "SubTotal w/o Disc", "SubTotal"}
+	colWidths := []float64{15, 58, 23, 18, 23, 28, 25}
+	headerHeight := 12.0
 	for i, h := range headers {
-		f.CellFormat(colWidths[i], 10, h, "1", 0, "C", false, 0, "")
+		// Draw fixed-height bordered cell first, then overlay text → uniform height for ALL headers
+		x := f.GetX()
+		y := f.GetY()
+		
+		// 1. Draw empty tall cell with border (forces uniform height)
+		f.CellFormat(colWidths[i], headerHeight, "", "1", 0, "", false, 0, "")
+		
+		// 2. Reset position and write the text (supports \n)
+		f.SetXY(x, y)
+		f.MultiCell(colWidths[i], 6, h, "", "C", false)
+		
+		// Move to next column at original Y
+		f.SetXY(x+colWidths[i], y)
 	}
-	f.Ln(-1)
+	f.Ln(headerHeight)
 
 	// Table rows
 	f.SetFont("Arial", "", 11)
 	for _, item := range bill.BillItems {
 		f.CellFormat(15, 8, strconv.Itoa(item.SlNo), "1", 0, "C", false, 0, "")
-		f.CellFormat(65, 8, item.Item, "1", 0, "L", false, 0, "")
-		f.CellFormat(25, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "R", false, 0, "")
-		f.CellFormat(20, 8, strconv.Itoa(item.Quantity), "1", 0, "C", false, 0, "")
-		f.CellFormat(25, 8, item.Discount, "1", 0, "C", false, 0, "")
-		f.CellFormat(30, 8, fmt.Sprintf("%.2f", item.SubTotal), "1", 0, "R", false, 0, "")
+		f.CellFormat(58, 8, item.Item, "1", 0, "L", false, 0, "")
+		f.CellFormat(23, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "R", false, 0, "")
+		f.CellFormat(18, 8, strconv.Itoa(item.Quantity), "1", 0, "C", false, 0, "")
+		f.CellFormat(23, 8, item.Discount, "1", 0, "C", false, 0, "")
+
+		// New column: SubTotal without discount = MRPOrNet * Quantity
+		subTotalNoDisc := item.MRPOrNet * float64(item.Quantity)
+		f.CellFormat(28, 8, fmt.Sprintf("%.2f", subTotalNoDisc), "1", 0, "R", false, 0, "")
+
+		f.CellFormat(25, 8, fmt.Sprintf("%.2f", item.SubTotal), "1", 0, "R", false, 0, "")
 		f.Ln(-1)
 	}
 
