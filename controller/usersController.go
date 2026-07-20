@@ -32,8 +32,8 @@ func isPasswordValid(password string) bool {
 func SignUp(c *gin.Context) {
 	// Get the email or password from the request body
 	var user struct {
-		Email string
-		Password string
+		Email string `json:"email"`
+		Password string `json:"password"`
 	}
 	if c.Bind(&user) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -90,9 +90,9 @@ func SignUp(c *gin.Context) {
 func AdminSignUp(c *gin.Context) {
 	// Get the email or password from the request body
 	var user struct {
-		Email string
-		Password string
-		isAdmin bool
+		Email string `json:"email"`
+		Password string `json:"password"`
+		IsAdmin bool `json:"isAdmin"`
 	}
 	if c.Bind(&user) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -111,7 +111,7 @@ func AdminSignUp(c *gin.Context) {
 		return
 	}
 
-	if user.isAdmin {
+	if user.IsAdmin {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "Only admins can use this API"})
 		return
 	}
@@ -148,8 +148,8 @@ func getRoutesByRole(role bool) ([]model.Routes, error) {
 func Login(c *gin.Context) {
 	// Get the email and password from the request body
 	var user struct {
-		Email string
-		Password string
+		Email string `json:"email"`
+		Password string `json:"password"`
 	}
 	if c.Bind(&user) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
