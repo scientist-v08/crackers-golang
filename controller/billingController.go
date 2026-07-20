@@ -45,13 +45,13 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 	// Heading
 	title := "Vinayaka Traders"
 	f.CellFormat(190, 10, title, "", 1, "C", false, 0, "")
-	f.Ln(20)
+	f.Ln(5)
 
 	// Flex-like section
 	y := f.GetY()
 
 	// Left div: Customer details
-	f.SetFont("Arial", "", 12)
+	f.SetFont("Arial", "", 10)
 	f.SetXY(10, y)
 	customerText := fmt.Sprintf("Customer: %s\nMobile: %s\nBill ID: %d", bill.User, bill.Mobile, billID)
 	f.MultiCell(90, 5, customerText, "", "L", false)
@@ -59,8 +59,8 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 
 	// Right div: Terms
 	f.SetXY(110, y)
-	termsText := "Terms: Quality not guaranteed by retailer. Contact brand for complaints."
-	f.MultiCell(80, 6, termsText, "", "L", false)
+	termsText := "T&C: Quality not guaranteed by retailer. Contact brand for complaints."
+	f.MultiCell(90, 6, termsText, "", "R", false)
 	yRight := f.GetY()
 
 	// Move to the bottom of the taller section
@@ -70,10 +70,12 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 	}
 	f.SetY(maxY)
 
+	f.Ln(5)
+
 	// Table headers
-	f.SetFont("Arial", "B", 12)
-	headers := []string{"SlNo", "Item", "MRP/Net", "Quantity", "SubTotal w/o Disc", "Discount", "SubTotal"}
-	colWidths := []float64{15, 58, 23, 18, 23, 28, 25}
+	f.SetFont("Arial", "B", 10)
+	headers := []string{"Sl.No", "Item", "MRP/Net", "Quantity", "SubTotal w/o Discount", "Discount", "SubTotal"}
+	colWidths := []float64{15, 58, 23, 18, 28, 23, 25}
 	headerHeight := 12.0
 	for i, h := range headers {
 		// Draw fixed-height bordered cell first, then overlay text → uniform height for ALL headers
@@ -93,7 +95,7 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 	f.Ln(headerHeight)
 
 	// Table rows
-	f.SetFont("Arial", "", 11)
+	f.SetFont("Arial", "", 10)
 	for _, item := range bill.BillItems {
 		f.CellFormat(15, 8, strconv.Itoa(item.SlNo), "1", 0, "C", false, 0, "")
 		f.CellFormat(58, 8, item.Item, "1", 0, "L", false, 0, "")
@@ -116,7 +118,7 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 
 	// Finalized Amount
 	if bill.FinalizedAmt > 0 {
-		f.SetFont("Arial", "B", 13)  // slightly bigger for emphasis
+		f.SetFont("Arial", "B", 12)  // slightly bigger for emphasis
 		f.CellFormat(150, 12, "Finalized Amount:", "", 0, "R", false, 0, "")
 		f.CellFormat(40, 12, fmt.Sprintf("%d", bill.FinalizedAmt), "", 0, "R", false, 0, "")
 	}
