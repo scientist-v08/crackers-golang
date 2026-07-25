@@ -9,8 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/scientist-v08/crackers/initializers"
-	"github.com/scientist-v08/crackers/model"
 )
 
 // RequireAuth verifies JWT tokens in the Authorization header
@@ -73,26 +71,31 @@ func RequireAnyRole(allowedRoles ...string) gin.HandlerFunc {
 		// Extract claims and set them in context
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 
+			raw, ok := claims["sub"].([]interface{})
+			if !ok {
+				// handle missing or wrong type
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid JWT",
+				})
+				c.Abort()
+				return // or whatever
+			}
             // Check if a user with the given ID exists
-            var user model.User
-            result := initializers.DB.First(&user, uint(claims["sub"].(float64)))
-            // If it doesn't exist return an error
-            if result.Error != nil {
-                c.JSON(http.StatusUnauthorized, gin.H{
-                    "error": "Unable to find any existing user",
-                })
-                c.Abort()
-			    return
-            }
+			roles := make([]string, 0, len(raw))
+			for _, v := range raw {
+				if s, ok := v.(string); ok {
+					roles = append(roles, s)
+				}
+			}
 
             // Check if user has any of the required roles
             hasValidRole := false
-            for _, userRole := range user.Roles {
+            for _, userRole := range roles {
                 if slices.Contains(allowedRoles, userRole) {
                     hasValidRole = true
                 }
                 if hasValidRole {
-					c.Set("roles", user.Roles)
+					c.Set("roles", roles)
                     break
                 }
             }
