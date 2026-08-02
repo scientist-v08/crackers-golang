@@ -2,9 +2,11 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +15,35 @@ import (
 	"gorm.io/gorm"
 )
 
+type FlexInt int
+
+func (fi *FlexInt) UnmarshalJSON(b []byte) error {
+	// Try normal number first
+	var n int
+	if err := json.Unmarshal(b, &n); err == nil {
+		*fi = FlexInt(n)
+		return nil
+	}
+
+	// Fall back to string
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	*fi = FlexInt(n)
+	return nil
+}
+
 // ---------- Front-end interfaces (mirrored in Go) ----------
 type Item struct {
 	SlNo     int     `json:"slNo"`
 	Item     string  `json:"item" binding:"required"`
 	MRPOrNet float64 `json:"mrpOrNet" binding:"required,gt=0"`
-	Quantity int     `json:"quantity" binding:"required,gt=0"`
+	Quantity FlexInt `json:"quantity" binding:"required,gt=0"`
 	Discount string  `json:"discount"`
 	SubTotal float64 `json:"subTotal" binding:"required,gt=0"`
 }
@@ -34,6 +59,65 @@ type BillDetails struct {
 // ---------- Helper: convert float → int32 (cents) ----------
 func toCents(v float64) int32 {
 	return int32(v)
+}
+
+func parseDiscount(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty discount")
+	}
+
+	// Remove trailing %
+	s = strings.TrimSuffix(s, "%")
+	s = strings.TrimSpace(s)
+
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// If the original value was ≥ 1 we treat it as a percentage
+	// (75 → 0.25, 10 → 0.90, etc.)
+	if val >= 1 {
+		return 1 - (val / 100), nil
+	}
+
+	// Already a multiplier (0.25, 0.9, …)
+	return val, nil
+}
+
+// ---------- Helper: Re-calculate the sub-totals and the grand total ------------
+func recalculateSubTotalsAndGrandTotal(bill *BillDetails) error {
+	var grandTotal float64
+	discountMultiplier, err := parseDiscount(bill.BillItems[0].Discount)
+	if err != nil {
+		return fmt.Errorf("invalid discount %q: %w", bill.BillItems[0].Discount, err)
+	}
+
+	for i := range bill.BillItems {
+		item := &bill.BillItems[i]
+
+		qty := float64(item.Quantity)
+		mrp := item.MRPOrNet
+
+		var subTotal float64
+
+		if strings.HasPrefix(item.Item, "Other") {
+			// Rule 1: Other* → MRP × Quantity
+			subTotal = mrp * qty
+		} else {
+			// Rule 2: everything else → MRP × Quantity × Discount
+			subTotal = mrp * qty * discountMultiplier
+		}
+
+		// Overwrite the value the client sent
+		item.SubTotal = subTotal
+		grandTotal += subTotal
+	}
+
+	// Overwrite the value the client sent
+	bill.GrandTotal = grandTotal
+	return nil
 }
 
 // ---------- Generate PDF ----------
@@ -73,6 +157,7 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 	f.Ln(5)
 
 	// Table headers
+	f.SetFillColor(217, 221, 220)
 	f.SetFont("Arial", "B", 10)
 	headers := []string{"Sl.No", "Item", "MRP/Net", "Quantity", "SubTotal w/o Discount", "Discount", "SubTotal"}
 	colWidths := []float64{15, 58, 23, 18, 28, 23, 25}
@@ -83,7 +168,7 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 		y := f.GetY()
 		
 		// 1. Draw empty tall cell with border (forces uniform height)
-		f.CellFormat(colWidths[i], headerHeight, "", "1", 0, "", false, 0, "")
+		f.CellFormat(colWidths[i], headerHeight, "", "1", 0, "", true, 0, "")
 		
 		// 2. Reset position and write the text (supports \n)
 		f.SetXY(x, y)
@@ -100,7 +185,7 @@ func generatePDF(bill BillDetails, billID uint) ([]byte, error) {
 		f.CellFormat(15, 8, strconv.Itoa(item.SlNo), "1", 0, "C", false, 0, "")
 		f.CellFormat(58, 8, item.Item, "1", 0, "L", false, 0, "")
 		f.CellFormat(23, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "R", false, 0, "")
-		f.CellFormat(18, 8, strconv.Itoa(item.Quantity), "1", 0, "C", false, 0, "")
+		f.CellFormat(18, 8, strconv.Itoa(int(item.Quantity)), "1", 0, "C", false, 0, "")
 		// New column: SubTotal without discount = MRPOrNet * Quantity
 		subTotalNoDisc := item.MRPOrNet * float64(item.Quantity)
 		f.CellFormat(28, 8, fmt.Sprintf("%.2f", subTotalNoDisc), "1", 0, "R", false, 0, "")
@@ -140,6 +225,12 @@ func CreateBillHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req BillDetails
 		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Discard client totals and recalculate
+		if err := recalculateSubTotalsAndGrandTotal(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -205,6 +296,13 @@ func CreatePreviewBillHandler(c *gin.Context) {
 	}
 	req.User = "NA--PREVIEW"
 	req.Mobile = "NA--PREVIEW"
+
+	// Discard client totals and recalculate
+	if err := recalculateSubTotalsAndGrandTotal(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Generate PDF
 	pdfBytes, errPdf := generatePDF(req, 0)
 	if errPdf != nil {
