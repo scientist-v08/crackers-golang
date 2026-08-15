@@ -42,6 +42,7 @@ func main() {
 	routes.RegisterBillingRoutes(r)
 	routes.RegisterInventoryRoutes(r)
 	routes.RegisterExpenseRoutes(r)
+	routes.RegisterPriceList(r)
 	
 	// Now run the application
 	r.Run()
