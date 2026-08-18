@@ -47,6 +47,7 @@ func ConnectToDb() {
 
 	insertDefaultRoutes()
 	insertStandardPriceList()
+	insertSupremeArdAyyanPriceList()
 }
 
 func insertDefaultRoutes() {
@@ -144,6 +145,42 @@ func insertStandardPriceList() {
 			log.Println("Failed to insert standard price list")
 		} else {
 			log.Println("Standard Price list inserted")
+		}
+	}
+}
+
+func insertSupremeArdAyyanPriceList() {
+	var count int64
+	DB.Model(&model.PriceList{}).Where("brand IN ?", []string{"Supreme", "ARD", "Ayyan"}).Count(&count)
+	
+	if count == 0 {
+		supremeArdAyyanPriceList := []model.PriceList{
+			{Brand: "Supreme", Item: "1 1/2\" Comet", Price: 150},
+			{Brand: "Supreme", Item: "30 Shots", Price: 900},
+			{Brand: "Supreme", Item: "100 Shots", Price: 4000},
+			{Brand: "Supreme", Item: "Peacock", Price: 500},
+			{Brand: "ARD", Item: "102 Shots", Price: 3600},
+			{Brand: "ARD", Item: "20 Shots (2\" Comet)", Price: 1600},
+			{Brand: "ARD", Item: "3000 Lar", Price: 3000},
+			{Brand: "ARD", Item: "1000 Lar", Price: 900},
+			{Brand: "Ayyan", Item: "10000 Lar", Price: 13000},
+			{Brand: "Ayyan", Item: "1000 Lar", Price: 1500},
+			{Brand: "Ayyan", Item: "600 Lar", Price: 1200},
+			{Brand: "Ayyan", Item: "Megapeacock", Price: 750},
+			{Brand: "Ayyan", Item: "2\" Comet", Price: 300},
+			{Brand: "Ayyan", Item: "3\" Comet", Price: 600},
+			{Brand: "Ayyan", Item: "3\" Premium Comet", Price: 700},
+			{Brand: "Ayyan", Item: "12 Shots", Price: 400},
+			{Brand: "Ayyan", Item: "25 Shots", Price: 900},
+			{Brand: "Ayyan", Item: "30 Shots", Price: 1300},
+			{Brand: "Ayyan", Item: "60 Shots", Price: 2500},
+			{Brand: "Ayyan", Item: "120 Shots", Price: 4500},
+		}
+
+		if err := DB.Create(&supremeArdAyyanPriceList).Error; err != nil {
+			log.Println("Failed to insert supreme, ARD & Ayyan price list")
+		} else {
+			log.Println("Supreme, ARD & Ayyan Price list inserted")
 		}
 	}
 }
