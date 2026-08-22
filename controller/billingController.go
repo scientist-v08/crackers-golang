@@ -53,6 +53,7 @@ type BillDetails struct {
 	Mobile     	 string  `json:"mobile" binding:"required"`
 	GrandTotal 	 float64 `json:"grandTotal" binding:"required,gt=0"`
 	FinalizedAmt int32 `json:"finalizedAmt"`
+	Discount string  `json:"discount" binding:"required"`
 	BillItems    []Item  `json:"billItems" binding:"required,min=1"`
 }
 
@@ -89,9 +90,9 @@ func parseDiscount(s string) (float64, error) {
 // ---------- Helper: Re-calculate the sub-totals and the grand total ------------
 func recalculateSubTotalsAndGrandTotal(bill *BillDetails) error {
 	var grandTotal float64
-	discountMultiplier, err := parseDiscount(bill.BillItems[0].Discount)
+	discountMultiplier, err := parseDiscount(bill.Discount)
 	if err != nil {
-		return fmt.Errorf("invalid discount %q: %w", bill.BillItems[0].Discount, err)
+		return fmt.Errorf("invalid discount %q: %w", bill.Discount, err)
 	}
 
 	for i := range bill.BillItems {
