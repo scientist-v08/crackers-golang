@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/scientist-v08/crackers/constants"
@@ -144,33 +145,54 @@ func GetPaginatedInventoryItems(c *gin.Context) {
 		},
 	})
 
-	// Pagination
+	// Parallelize the 3 DB calls using go routines
+	var wg sync.WaitGroup
+	var inventoryErr, countErr, totalErr error
 	var inventories []model.Inventory
-	if err := listQuery.Offset(offset).Limit(pageSize).Find(&inventories).Error; err != nil {
+	var totalElements int64
+	var totalSubtotal int64
+
+	wg.Add(3)
+
+	// Pagination
+	go func() {
+		defer wg.Done()
+		inventoryErr = listQuery.Offset(offset).Limit(pageSize).Find(&inventories).Error
+	}()
+	
+	// Total count (filtered)
+	go func() {
+		defer wg.Done()
+		countErr = countQuery.Count(&totalElements).Error
+	}()
+	
+	// Total subtotal (sum of sub_total for filtered results)
+	go func() {
+		defer wg.Done()
+		sumQuery := query.Session(&gorm.Session{}).Select("inventories.id")
+		totalErr = initializers.DB.
+			Table("(?) as filtered_inventories", sumQuery).
+			Select("COALESCE(SUM(sub_total), 0)").
+			Joins("JOIN inventories ON inventories.id = filtered_inventories.id").
+			Scan(&totalSubtotal).Error
+	}()
+
+	// Wait for all the go routines to complete
+	wg.Wait()
+	
+	// Response
+	if inventoryErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch inventory items"})
 		return
 	}
-
-	// Total count (filtered)
-	var totalElements int64
-	if err := countQuery.Count(&totalElements).Error; err != nil {
+	if countErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count items"})
 		return
 	}
-
-	// Total subtotal (sum of sub_total for filtered results)
-	var totalSubtotal int64
-	sumQuery := query.Session(&gorm.Session{}).Select("inventories.id")
-	if err := initializers.DB.
-		Table("(?) as filtered_inventories", sumQuery).
-		Select("COALESCE(SUM(sub_total), 0)").
-		Joins("JOIN inventories ON inventories.id = filtered_inventories.id").
-		Scan(&totalSubtotal).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
+	if totalErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to obtain total cost"})
+		return
 	}
-
-	// Response
 	c.JSON(http.StatusOK, gin.H{
 		"inventoryItems": inventories,
 		"total": totalSubtotal,
