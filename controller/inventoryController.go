@@ -128,7 +128,7 @@ func GetPaginatedInventoryItems(c *gin.Context) {
 	}
 
 	if searchTitle != "" {
-		query = query.Where("item LIKE ?", "%"+searchTitle+"%")
+		query = query.Where("item ILIKE ?", "%"+searchTitle+"%")
 	}
 
 	// Clone query for counting and summing to avoid side effects

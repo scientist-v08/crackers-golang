@@ -100,6 +100,10 @@ func AdminSignUp(c *gin.Context) {
 		})
 		return
 	}
+	if !user.IsAdmin {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Only admins can use this API"})
+		return
+	}
 
 	// Hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
@@ -108,11 +112,6 @@ func AdminSignUp(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Failed to hash password",
 		})
-		return
-	}
-
-	if user.IsAdmin {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": "Only admins can use this API"})
 		return
 	}
 
