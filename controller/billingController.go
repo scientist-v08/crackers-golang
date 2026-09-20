@@ -27,7 +27,7 @@ func CreateBillHandler(c *gin.Context) {
 
 	// Save data into DB
 	if err := service.GenerateBillService(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -57,19 +57,19 @@ func CreatePreviewBillHandler(c *gin.Context) {
 	req.User = "NA--PREVIEW"
 	req.Mobile = "NA--PREVIEW"
 
-	// Discard client totals and recalculate
+	// 3. Discard client totals and recalculate
 	if err := utils.RecalculateSubTotalsAndGrandTotal(&req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	pdfBytes, err := service.PreviewBillService(req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Send PDF in response
+	// 4. Send PDF in response
 	loc, _ := time.LoadLocation("Asia/Kolkata")
 	nowIST := time.Now().In(loc)
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="bill_preview_%s.pdf"`, nowIST))
