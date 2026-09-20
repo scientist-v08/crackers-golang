@@ -1,13 +1,10 @@
 package model
 
-import (
-	"gorm.io/gorm"
-)
-
 type Billing struct {
-	gorm.Model
-	User         	string
-	Mobile			string
-	GrandTotal      int32
-	FinalizedAmt    int32
+	ID           uint64
+	User         string
+	Mobile       string
+	GrandTotal   int32
+	FinalizedAmt int32
+	Purchases    []Purchases
 }

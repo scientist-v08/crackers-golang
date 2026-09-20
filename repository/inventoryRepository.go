@@ -92,7 +92,7 @@ func FindByInvId(tx *gorm.DB, id uint) (*model.Inventory, error) {
 	return &inv, nil
 }
 
-func UpdateInventory(tx *gorm.DB, id uint, updates any) error {
+func UpdateInventory(tx *gorm.DB, id uint64, updates any) error {
 	db := initializers.DB
 	if tx != nil {
 		db = tx

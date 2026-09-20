@@ -1,9 +1,7 @@
 package model
 
-import "gorm.io/gorm"
-
 type Expense struct {
-	gorm.Model
+	ID               uint64
 	ReasonForExpense string
 	Amount			 int32
 }
