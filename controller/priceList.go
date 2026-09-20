@@ -4,22 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/scientist-v08/crackers/dto"
 	"github.com/scientist-v08/crackers/initializers"
 	"github.com/scientist-v08/crackers/model"
 )
-
-type Products struct {
-	Id    uint   `json:"id"`
-	Price uint   `json:"price"`
-	Item  string `json:"item"`
-}
-
-type ProductsList struct {
-	Brand string     `json:"brand"`
-	List  []Products `json:"list"`
-}
-
-type PriceListBrandMapping map[string][]Products
 
 func GetAllPrices(c *gin.Context) {
 	var allPrices []model.PriceList
@@ -28,18 +16,18 @@ func GetAllPrices(c *gin.Context) {
 		return
 	}
 
-	grouped := make(PriceListBrandMapping)
+	grouped := make(dto.PriceListBrandMapping)
 	for _, item := range allPrices {
-		grouped[item.Brand] = append(grouped[item.Brand], Products{
+		grouped[item.Brand] = append(grouped[item.Brand], dto.Products{
 			Id: item.Id,
 			Price: item.Price,
 			Item: item.Item,
 		})
 	}
 
-	result := make([]ProductsList, 0, len(grouped))
+	result := make([]dto.ProductsList, 0, len(grouped))
 	for brand, product := range grouped {
-		result = append(result, ProductsList{
+		result = append(result, dto.ProductsList{
 			Brand: brand,
 			List: product,
 		})
