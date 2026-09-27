@@ -2,13 +2,13 @@ package middleware
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/scientist-v08/crackers/initializers"
 )
 
 // RequireAuth verifies JWT tokens in the Authorization header
@@ -47,7 +47,7 @@ func RequireAnyRole(allowedRoles ...string) gin.HandlerFunc {
 			}
 
 			// Return the secret key for validation
-			return []byte(os.Getenv("JWT_SECRET")), nil
+			return []byte(initializers.Secret), nil
 		})
 
 		// Handle token parsing errors
