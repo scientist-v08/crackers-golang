@@ -2,12 +2,12 @@ package service
 
 import (
 	"errors"
-	"os"
 	"slices"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/scientist-v08/crackers/constants"
+	"github.com/scientist-v08/crackers/initializers"
 	"github.com/scientist-v08/crackers/model"
 	"github.com/scientist-v08/crackers/repository"
 	"github.com/scientist-v08/crackers/utils"
@@ -76,7 +76,7 @@ func Login(email, password string) (string, []model.Routes, error) {
 		"exp": time.Now().Add(time.Hour * 12).Unix(),
 	})
 
-	secret := os.Getenv("JWT_SECRET")
+	secret := initializers.Secret
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", nil, errors.New("failed to create JWT token")

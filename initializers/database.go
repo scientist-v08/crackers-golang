@@ -12,6 +12,7 @@ import (
 )
 
 var DB *gorm.DB
+var Secret string
 
 func ConnectToDb() {
     var err error
@@ -30,6 +31,8 @@ func ConnectToDb() {
     if err != nil {
         log.Fatal("Failed to connect to database")
     }
+
+	Secret = os.Getenv("JWT_SECRET")
 
 	// AutoMigrate creates the table if it doesn't exist
 	err = DB.AutoMigrate(

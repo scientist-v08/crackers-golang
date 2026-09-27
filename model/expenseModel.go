@@ -1,7 +1,7 @@
 package model
 
 type Expense struct {
-	ID               uint64
-	ReasonForExpense string
-	Amount			 int32
+	ID               uint64 `json:"id"`
+	ReasonForExpense string `json:"reasonForExpense"`
+	Amount           int32  `json:"amount"`
 }
