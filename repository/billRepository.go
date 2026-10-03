@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func AddNewBill(tx *gorm.DB, req *model.BillDetails) error {
+func AddNewBill(tx *gorm.DB, req *model.BillDetails) (uint64, error) {
 	// Check for transaction
 	db := initializers.DB
 	if tx != nil {
@@ -41,8 +41,8 @@ func AddNewBill(tx *gorm.DB, req *model.BillDetails) error {
 		Purchases:    purchases, // nested association
 	}
 	if errBilling := db.Create(&billing).Error; errBilling != nil {
-		return errBilling
+		return 0, errBilling
 	}
 
-	return nil
+	return billing.ID, nil
 }

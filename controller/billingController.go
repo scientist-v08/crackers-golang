@@ -26,13 +26,15 @@ func CreateBillHandler(c *gin.Context) {
 	}
 
 	// Save data into DB
-	if err := service.GenerateBillService(req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	_id := uint64(0)
+	var generateBillErr error
+	if _id, generateBillErr = service.GenerateBillService(req); generateBillErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": generateBillErr.Error()})
 		return
 	}
 
 	// Generate PDF
-	pdfBytes, err := service.PreviewBillService(req)
+	pdfBytes, err := service.PreviewBillService(req, _id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -63,7 +65,7 @@ func CreatePreviewBillHandler(c *gin.Context) {
 		return
 	}
 
-	pdfBytes, err := service.PreviewBillService(req)
+	pdfBytes, err := service.PreviewBillService(req, 0)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
