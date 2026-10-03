@@ -6,19 +6,19 @@ import (
 	"github.com/scientist-v08/crackers/utils"
 )
 
-func PreviewBillService(req model.BillDetails) ([]byte, error) {
+func PreviewBillService(req model.BillDetails, id uint64) ([]byte, error) {
 	// Generate PDF
-	pdfBytes, errPdf := utils.GeneratePDF(req, 0)
+	pdfBytes, errPdf := utils.GeneratePDF(req, id)
 	if errPdf != nil {
 		return nil, errPdf
 	}
 	return pdfBytes, nil
 }
 
-func GenerateBillService(req model.BillDetails) error {
+func GenerateBillService(req model.BillDetails) (uint64, error) {
 	tx := repository.Begin()
 	if tx.Error != nil {
-		return tx.Error
+		return 0, tx.Error
 	}
 
 	defer func() {
@@ -27,15 +27,17 @@ func GenerateBillService(req model.BillDetails) error {
 			panic(r)
 		}
 	}()
-
-	if err := repository.AddNewBill(tx, &req); err != nil {
+	
+	_id := uint64(0)
+	var addBillErr error
+	if _id, addBillErr = repository.AddNewBill(tx, &req); addBillErr != nil {
 		tx.Rollback()
-		return err
+		return 0, addBillErr
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return _id, nil
 }
