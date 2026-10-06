@@ -1,4 +1,4 @@
-package model
+package dto
 
 type Billing struct {
 	ID           uint64

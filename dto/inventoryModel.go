@@ -1,4 +1,4 @@
-package model
+package dto
 
 import (
 	"github.com/scientist-v08/crackers/constants"
@@ -7,8 +7,8 @@ import (
 type Inventory struct {
 	ID              uint64
 	BrandOrCompany  string
-	State           constants.InventoryState `gorm:"type:varchar(20);index"`
-	Item            string `gorm:"index"`
+	State           constants.InventoryState
+	Item            string
 	NumOfBoxes		int32
 	NumOfCartons    int32
 	PricePerCarton  int32

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jung-kurt/gofpdf"
-	"github.com/scientist-v08/crackers/model"
+	"github.com/scientist-v08/crackers/dto"
 )
 
 func ToCents(v float64) int32 {
@@ -40,7 +40,7 @@ func ParseDiscount(s string) (float64, error) {
 }
 
 // ---------- Helper: Re-calculate the sub-totals and the grand total ------------
-func RecalculateSubTotalsAndGrandTotal(bill *model.BillDetails) error {
+func RecalculateSubTotalsAndGrandTotal(bill *dto.BillDetails) error {
 	var grandTotal float64
 	discountMultiplier, err := ParseDiscount(bill.Discount)
 	if err != nil {
@@ -74,7 +74,7 @@ func RecalculateSubTotalsAndGrandTotal(bill *model.BillDetails) error {
 }
 
 // ---------- Generate PDF ----------
-func GeneratePDF(bill model.BillDetails, billID uint64) ([]byte, error) {
+func GeneratePDF(bill dto.BillDetails, billID uint64) ([]byte, error) {
 	f := gofpdf.New("P", "mm", "A4", "")
 	f.AddPage()
 	f.SetFont("Arial", "B", 16)

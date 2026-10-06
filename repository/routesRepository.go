@@ -1,12 +1,12 @@
 package repository
 
 import (
+	"context"
+
+	"github.com/scientist-v08/crackers/db"
 	"github.com/scientist-v08/crackers/initializers"
-	"github.com/scientist-v08/crackers/model"
 )
 
-func FindByRole(role string) ([]model.Routes, error) {
-	var routes []model.Routes
-	err := initializers.DB.Where("role = ?", role).Find(&routes).Error
-	return routes, err
+func FindByRole(role string) ([]db.Route, error) {
+	return initializers.Queries.FindRoutesByRole(context.Background(), role)
 }

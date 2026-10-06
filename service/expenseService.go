@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/scientist-v08/crackers/db"
 	"github.com/scientist-v08/crackers/dto"
-	"github.com/scientist-v08/crackers/model"
 	"github.com/scientist-v08/crackers/repository"
 )
 
@@ -47,7 +47,7 @@ func GetAllExpenseService() (dto.GetExpenseRes, error) {
 	// 1. Create variables for obtaining errors and for go routines
 	var allExpensesErr, totalErr error
 	var wg sync.WaitGroup
-	var resOfAllExpenses []model.Expense
+	var resOfAllExpenses []db.Expense
 	var totalAmount int64
 
 	wg.Add(2)
@@ -75,6 +75,16 @@ func GetAllExpenseService() (dto.GetExpenseRes, error) {
 		return dto.GetExpenseRes{}, totalErr
 	}
 
-	// 6. Return results
-	return dto.GetExpenseRes{Expenses: resOfAllExpenses, Total: totalAmount}, nil
+	// 6. Map db.Expense → dto.Expense
+	expenses := make([]dto.Expense, 0, len(resOfAllExpenses))
+	for _, e := range resOfAllExpenses {
+		expenses = append(expenses, dto.Expense{
+			ID:               e.ID,                 // adjust field names if different
+			ReasonForExpense: e.ReasonForExpense.String,   // adjust if the db field is named differently
+			Amount:           e.Amount.Int32,             // cast if needed (int32 vs int64 etc.)
+		})
+	}
+
+	// 7. Return results
+	return dto.GetExpenseRes{Expenses: expenses, Total: totalAmount}, nil
 }

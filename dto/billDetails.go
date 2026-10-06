@@ -1,4 +1,4 @@
-package model
+package dto
 
 type BillDetails struct {
 	User         string  `json:"user" binding:"required"`
