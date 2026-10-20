@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -63,13 +64,15 @@ func RecalculateSubTotalsAndGrandTotal(bill *dto.BillDetails) error {
 			subTotal = mrp * qty * discountMultiplier
 		}
 
-		// Overwrite the value the client sent
+		// Round to 2 decimal places (currency)
+		subTotal = math.Round(subTotal*100) / 100
+
 		item.SubTotal = subTotal
 		grandTotal += subTotal
 	}
 
-	// Overwrite the value the client sent
-	bill.GrandTotal = grandTotal
+	// Also round the grand total for consistency
+	bill.GrandTotal = math.Round(grandTotal*100) / 100
 	return nil
 }
 
