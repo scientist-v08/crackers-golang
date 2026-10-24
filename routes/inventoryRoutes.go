@@ -8,7 +8,7 @@ import (
 )
 
 func RegisterInventoryRoutes(r *fiber.App) {
-	r.Post("/post/inventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.AddItemToInventoryHandler)
-	r.Get("/get/inventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.GetPaginatedInventoryItems)
-	r.Post("/post/updateInventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.UpdateInventory)
+	r.Post("/admin/inventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.AddItemToInventoryHandler)
+	r.Get("/admin/inventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.GetPaginatedInventoryItems)
+	r.Post("/admin/updateInventory", middleware.RequireAnyRole(constants.RoleAdmin), controller.UpdateInventory)
 }

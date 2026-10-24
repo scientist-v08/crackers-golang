@@ -1,6 +1,8 @@
 package service
 
 import (
+	"sort"
+
 	"github.com/scientist-v08/crackers/dto"
 	"github.com/scientist-v08/crackers/repository"
 )
@@ -29,6 +31,10 @@ func GetAllPricesService() ([]dto.ProductsList, error) {
 			List:  products,
 		})
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Brand < result[j].Brand
+	})
 
 	return result, nil
 }

@@ -8,5 +8,5 @@ import (
 )
 
 func RegisterPriceList(app *fiber.App) {
-	app.Get("/get/price-list", middleware.RequireAnyRole(constants.RoleUser, constants.RoleAdmin), controller.GetAllPrices)
+	app.Get("/all/price-list", middleware.RequireAnyRole(constants.RoleUser, constants.RoleAdmin), controller.GetAllPrices)
 }
