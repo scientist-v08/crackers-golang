@@ -8,6 +8,6 @@ import (
 )
 
 func RegisterExpenseRoutes(r *fiber.App) {
-	r.Post("/post/expenses", middleware.RequireAnyRole(constants.RoleAdmin), controller.CreateExpense)
-	r.Get("/get/expenses", middleware.RequireAnyRole(constants.RoleAdmin), controller.GetAllExpenses)
+	r.Post("/admin/expenses", middleware.RequireAnyRole(constants.RoleAdmin), controller.CreateExpense)
+	r.Get("/admin/expenses", middleware.RequireAnyRole(constants.RoleAdmin), controller.GetAllExpenses)
 }

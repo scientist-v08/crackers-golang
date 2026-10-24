@@ -8,6 +8,6 @@ import (
 )
 
 func RegisterBillingRoutes(r *fiber.App) {
-	r.Post("/billing", middleware.RequireAnyRole(constants.RoleUser, constants.RoleAdmin), controller.CreateBillHandler)
+	r.Post("/all/billing/preview", middleware.RequireAnyRole(constants.RoleUser, constants.RoleAdmin), controller.CreateBillHandler)
 	r.Post("/billing/preview", middleware.RequireAnyRole(constants.RoleUser, constants.RoleAdmin), controller.CreatePreviewBillHandler)
 }
