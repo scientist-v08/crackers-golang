@@ -1,37 +1,17 @@
 package controller
 
 import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
-	"github.com/scientist-v08/crackers/dto"
-	"github.com/scientist-v08/crackers/initializers"
-	"github.com/scientist-v08/crackers/model"
+	"github.com/gofiber/fiber/v3"
+	"github.com/scientist-v08/crackers/service"
 )
 
-func GetAllPrices(c *gin.Context) {
-	var allPrices []model.PriceList
-	if err := initializers.DB.Find(&allPrices).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
-		return
-	}
-
-	grouped := make(dto.PriceListBrandMapping)
-	for _, item := range allPrices {
-		grouped[item.Brand] = append(grouped[item.Brand], dto.Products{
-			Id: item.Id,
-			Price: item.Price,
-			Item: item.Item,
+func GetAllPrices(c fiber.Ctx) error {
+	result, err := service.GetAllPricesService()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
 		})
 	}
 
-	result := make([]dto.ProductsList, 0, len(grouped))
-	for brand, product := range grouped {
-		result = append(result, dto.ProductsList{
-			Brand: brand,
-			List: product,
-		})
-	}
-
-	c.JSON(http.StatusOK, result)
+	return c.Status(fiber.StatusOK).JSON(result)
 }

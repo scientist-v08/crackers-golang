@@ -1,4 +1,4 @@
-package model
+package dto
 
 type PriceList struct {
 	Id    uint   `gorm:"primaryKey;autoIncrement" json:"id"`

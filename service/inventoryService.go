@@ -1,15 +1,16 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"sync"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/scientist-v08/crackers/constants"
+	"github.com/scientist-v08/crackers/db"
 	"github.com/scientist-v08/crackers/dto"
-	"github.com/scientist-v08/crackers/model"
 	"github.com/scientist-v08/crackers/repository"
-	"gorm.io/gorm"
 )
 
 var (
@@ -17,29 +18,29 @@ var (
 	ErrInvalidStateTransition = errors.New("can only update records in Ordered or Received state")
 )
 
-func AddItemToinventory(reqBody model.InventoryReqBody) (bool, error) {
-	// 1. Create the required body to save to the DB
-	inventory := model.Inventory{
+func AddItemToinventory(reqBody dto.InventoryReqBody) (bool, error) {
+	ctx := context.Background()
+
+	inventory := dto.Inventory{
 		BrandOrCompany: reqBody.BrandOrCompany,
-		State:          reqBody.State,        
-		Item:           reqBody.Item,            
-		NumOfBoxes:     reqBody.NumOfBoxes,		
-		NumOfCartons:   reqBody.NumOfCartons, 
-		PricePerCarton: reqBody.PricePerCarton, 
+		State:          reqBody.State,
+		Item:           reqBody.Item,
+		NumOfBoxes:     reqBody.NumOfBoxes,
+		NumOfCartons:   reqBody.NumOfCartons,
+		PricePerCarton: reqBody.PricePerCarton,
 		SubTotal:       reqBody.PricePerCarton * reqBody.NumOfCartons,
 	}
-	// 2. Save to the DB
-	var (
-		isSaved bool
-		isError error
-	)
-	isSaved, isError = repository.AddItemToInventory(nil, inventory)
 
-	// 3. Return the result
-	return isSaved, isError
+	_, err := repository.AddItemToInventory(ctx, nil, inventory)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func GetPaginatedInventoryItems(req dto.InventoryListRequest) (*dto.InventoryListResponse, error) {
+	ctx := context.Background()
+
 	if req.PageNumber <= 0 {
 		req.PageNumber = 1
 	}
@@ -47,25 +48,9 @@ func GetPaginatedInventoryItems(req dto.InventoryListRequest) (*dto.InventoryLis
 		req.PageSize = 10
 	}
 
-	allowedSortColumns := map[string]bool{
-		"id":          true,
-		"item":        true,
-		"sub_total":   true,
-		"created_at":  true,
-		"updated_at":  true,
-		"state":       true,
-	}
-	if !allowedSortColumns[req.SortBy] {
-		req.SortBy = "id"
-	}
-
-	req.Order = strings.ToUpper(req.Order)
-	if req.Order != "ASC" && req.Order != "DESC" {
-		req.Order = "DESC"
-	}
-
-	// Validate state if present
-	filter := model.InventoryFilter{
+	// Note: sorting is now hardcoded to id DESC in the query.
+	// We keep the validation only for future flexibility.
+	filter := dto.InventoryFilter{
 		Title: strings.TrimSpace(req.Title),
 	}
 	if req.State != "" {
@@ -76,12 +61,12 @@ func GetPaginatedInventoryItems(req dto.InventoryListRequest) (*dto.InventoryLis
 		filter.State = state
 	}
 
-	offset := (req.PageNumber - 1) * req.PageSize
+	offset := int32((req.PageNumber - 1) * req.PageSize)
+	limit := int32(req.PageSize)
 
-	// ---- Parallel DB calls (same as original) ----
 	var (
 		wg            sync.WaitGroup
-		items         []model.Inventory
+		items         []db.Inventory
 		totalElements int64
 		totalSubtotal int64
 		errItems      error
@@ -93,17 +78,17 @@ func GetPaginatedInventoryItems(req dto.InventoryListRequest) (*dto.InventoryLis
 
 	go func() {
 		defer wg.Done()
-		items, errItems = repository.FindPaginatedInventory(offset, req.PageSize, req.SortBy, req.Order, filter)
+		items, errItems = repository.FindPaginatedInventory(ctx, offset, limit, filter)
 	}()
 
 	go func() {
 		defer wg.Done()
-		totalElements, errCount = repository.CountInventory(filter)
+		totalElements, errCount = repository.CountInventory(ctx, filter)
 	}()
 
 	go func() {
 		defer wg.Done()
-		totalSubtotal, errSum = repository.SumInventorySubTotal(filter)
+		totalSubtotal, errSum = repository.SumInventorySubTotal(ctx, filter)
 	}()
 
 	wg.Wait()
@@ -118,74 +103,84 @@ func GetPaginatedInventoryItems(req dto.InventoryListRequest) (*dto.InventoryLis
 		return nil, errSum
 	}
 
+	// Convert db.Inventory → model.Inventory (so existing DTO still works)
+	modelItems := make([]dto.Inventory, 0, len(items))
+	for _, item := range items {
+		modelItems = append(modelItems, dto.Inventory{
+			ID:             uint64(item.ID),
+			BrandOrCompany: item.BrandOrCompany.String,
+			State:          constants.InventoryState(item.State.String),
+			Item:           item.Item.String,
+			NumOfBoxes:     item.NumOfBoxes.Int32,
+			NumOfCartons:   item.NumOfCartons.Int32,
+			PricePerCarton: item.PricePerCarton.Int32,
+			SubTotal:       item.SubTotal.Int32,
+		})
+	}
+
 	return &dto.InventoryListResponse{
-		InventoryItems: items,
+		InventoryItems: modelItems,
 		Total:          totalSubtotal,
 		TotalElements:  totalElements,
 	}, nil
 }
 
-func UpdateInventory(req model.UpdateInventoryRequest) error {
-	tx := repository.Begin()
-	if tx.Error != nil {
-		return tx.Error
+func UpdateInventory(req dto.UpdateInventoryRequest) error {
+	ctx := context.Background()
+
+	tx, err := repository.Begin(ctx)
+	if err != nil {
+		return err
 	}
+	defer tx.Rollback(ctx) // safe even after Commit
 
-	defer func() {
-		if r:= recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		}
-	}()
-
-	existing, existErr := repository.FindByInvId(tx, req.ID)
-	if existErr != nil {
-		tx.Rollback()
-		if errors.Is(existErr, gorm.ErrRecordNotFound) {
+	existing, err := repository.FindByInvId(ctx, tx, int64(req.ID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrInventoryNotFound
 		}
-		return existErr
+		return err
 	}
 
-	if existing.State != constants.InventoryStateOrdered && existing.State != constants.InventoryStateReceived {
-		tx.Rollback()
+	currentState := constants.InventoryState(existing.State.String)
+
+	if currentState != constants.InventoryStateOrdered && currentState != constants.InventoryStateReceived {
 		return ErrInvalidStateTransition
 	}
 
-	reqSubTotal := req.NumOfCartons * existing.PricePerCarton
-	nextState := existing.State
-	switch existing.State {
+	reqSubTotal := req.NumOfCartons * existing.PricePerCarton.Int32
+	nextState := currentState
+
+	switch currentState {
 	case constants.InventoryStateOrdered:
 		nextState = constants.InventoryStateReceived
 	case constants.InventoryStateReceived:
 		nextState = constants.InventoryStateUnpacked
 	}
 
-	if existing.NumOfCartons == req.NumOfCartons {
+	if existing.NumOfCartons.Int32 == req.NumOfCartons {
 		// Full match → just advance state
 		updates := dto.UpdateInventoryState{
-			State:     nextState,
-			SubTotal: existing.NumOfCartons * existing.PricePerCarton,
+			State:    nextState,
+			SubTotal: existing.NumOfCartons.Int32 * existing.PricePerCarton.Int32,
 		}
-		if err := repository.UpdateInventory(tx, existing.ID, updates); err != nil {
-			tx.Rollback()
+		if err := repository.UpdateInventory(ctx, tx, existing.ID, updates); err != nil {
 			return err
 		}
 	} else {
 		// Partial receipt
-		difference := existing.NumOfCartons - req.NumOfCartons
-		newExistingSubTotal := difference * existing.PricePerCarton
+		difference := existing.NumOfCartons.Int32 - req.NumOfCartons
+		newExistingSubTotal := difference * existing.PricePerCarton.Int32
 
 		updateExisting := dto.InventoryUpdateDiff{
 			NumOfCartons: difference,
-			SubTotal:      newExistingSubTotal,
+			SubTotal:     newExistingSubTotal,
 		}
-		if err := repository.UpdateInventory(tx, existing.ID, updateExisting); err != nil {
-			tx.Rollback()
+		if err := repository.UpdateInventory(ctx, tx, existing.ID, updateExisting); err != nil {
 			return err
 		}
 
-		newRecord := model.Inventory{
+		newRecord := dto.Inventory{
 			BrandOrCompany: req.BrandOrCompany,
 			Item:           req.Item,
 			NumOfBoxes:     req.NumOfBoxes,
@@ -194,11 +189,10 @@ func UpdateInventory(req model.UpdateInventoryRequest) error {
 			SubTotal:       reqSubTotal,
 			State:          nextState,
 		}
-		if _, err := repository.AddItemToInventory(tx, newRecord); err != nil {
-			tx.Rollback()
+		if _, err := repository.AddItemToInventory(ctx, tx, newRecord); err != nil {
 			return err
 		}
 	}
 
-	return tx.Commit().Error
+	return tx.Commit(ctx)
 }

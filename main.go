@@ -4,37 +4,46 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/scientist-v08/crackers/initializers"
 	"github.com/scientist-v08/crackers/routes"
 )
 
-func setGinMode() {
-	// Set GIN MODE
-	if mode := os.Getenv("GIN_MODE"); mode != "" {
-		gin.SetMode(mode)
+var isProduction bool
+
+func setFiberMode() {
+	// Set Fiber MODE
+	if mode := os.Getenv("GIN_MODE"); mode == "debug" {
+		isProduction = false
+	} else {
+		isProduction = true
 	}
 }
 
 func init() {
 	initializers.LoadEnvVariables()
-	setGinMode()
+	setFiberMode()
 	initializers.ConnectToDb()
 }
 
 func main() {
-	r := gin.Default()
+	r := fiber.New(fiber.Config{
+		ServerHeader:  "Vinayaka Crackers",
+		AppName:       "Crackers API",
+		StrictRouting: true,
+		CaseSensitive: true,
+	})
 	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
 
 	// CORS configuration
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:  []string{allowedOrigin},
-		AllowMethods:  []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:  []string{fiber.MethodGet, fiber.MethodPost, fiber.MethodPut, fiber.MethodDelete, fiber.MethodOptions},
 		AllowHeaders:  []string{"Content-Type", "Authorization"},
     	ExposeHeaders: []string{"Content-Disposition", "Content-Length"},
 		AllowCredentials: true,
-		MaxAge: 12 * time.Hour,
+		MaxAge: int(12 * time.Hour),
 	}))
 
 	// Now initialize all the routes
@@ -45,5 +54,5 @@ func main() {
 	routes.RegisterPriceList(r)
 	
 	// Now run the application
-	r.Run()
+	r.Listen(":" + initializers.Port, fiber.ListenConfig{EnablePrefork: isProduction})
 }

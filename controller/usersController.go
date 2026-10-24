@@ -1,83 +1,77 @@
 package controller
 
 import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v3"
+	"github.com/scientist-v08/crackers/dto"
 	"github.com/scientist-v08/crackers/service"
 )
 
-func SignUp(c *gin.Context) {
+func SignUp(c fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
-		return
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read request body"})
 	}
 
 	if err := service.SignUp(req.Email, req.Password); err != nil {
-		status := http.StatusBadRequest
+		status := fiber.StatusBadRequest
 		if err.Error() == "user already exists" {
-			status = http.StatusConflict
+			status = fiber.StatusConflict
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
-		return
+		return c.Status(status).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Creating a new user: Successful"})
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Creating a new user: Successful"})
 }
 
-func AdminSignUp(c *gin.Context) {
+func AdminSignUp(c fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 		IsAdmin  bool   `json:"isAdmin"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
-		return
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read request body"})
 	}
 
 	if !req.IsAdmin {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Only admins can use this API"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Only admins can use this API"})
 	}
 
 	if err := service.AdminSignUp(req.Email, req.Password); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Creating a new user: Successful"})
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Creating a new user: Successful"})
 }
 
-func Login(c *gin.Context) {
+func Login(c fiber.Ctx) error {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
-		return
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read request body"})
 	}
 
 	token, routes, err := service.Login(req.Email, req.Password)
 	if err != nil {
-		status := http.StatusBadRequest
+		status := fiber.StatusBadRequest
 		if err.Error() == "invalid email ID" || err.Error() == "invalid password" {
-			status = http.StatusUnauthorized // more accurate
+			status = fiber.StatusUnauthorized // more accurate
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
-		return
+		return c.Status(status).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	dtoRoutes := dto.ToRoutes(routes)
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"access_token": token,
-		"routes":       routes,
+		"routes":       dtoRoutes,
 	})
 }

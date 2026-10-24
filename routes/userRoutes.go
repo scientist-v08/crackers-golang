@@ -1,12 +1,12 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v3"
 	"github.com/scientist-v08/crackers/controller"
 )
 
-func RegisterUserRoutes(r *gin.Engine) {
-	r.POST("/create/user", controller.SignUp)
-	r.POST("/create/admin", controller.AdminSignUp)
-	r.POST("/login/user", controller.Login)
+func RegisterUserRoutes(r *fiber.App) {
+	r.Post("/create/user", controller.SignUp)
+	r.Post("/create/admin", controller.AdminSignUp)
+	r.Post("/login/user", controller.Login)
 }

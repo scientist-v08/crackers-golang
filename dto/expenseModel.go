@@ -1,7 +1,7 @@
-package model
+package dto
 
 type Expense struct {
-	ID               uint64 `json:"id"`
+	ID               int64  `json:"id"`
 	ReasonForExpense string `json:"reasonForExpense"`
 	Amount           int32  `json:"amount"`
 }

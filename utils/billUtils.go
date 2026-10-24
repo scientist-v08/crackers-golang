@@ -3,11 +3,12 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/jung-kurt/gofpdf"
-	"github.com/scientist-v08/crackers/model"
+	"github.com/scientist-v08/crackers/dto"
 )
 
 func ToCents(v float64) int32 {
@@ -40,7 +41,7 @@ func ParseDiscount(s string) (float64, error) {
 }
 
 // ---------- Helper: Re-calculate the sub-totals and the grand total ------------
-func RecalculateSubTotalsAndGrandTotal(bill *model.BillDetails) error {
+func RecalculateSubTotalsAndGrandTotal(bill *dto.BillDetails) error {
 	var grandTotal float64
 	discountMultiplier, err := ParseDiscount(bill.Discount)
 	if err != nil {
@@ -63,23 +64,39 @@ func RecalculateSubTotalsAndGrandTotal(bill *model.BillDetails) error {
 			subTotal = mrp * qty * discountMultiplier
 		}
 
-		// Overwrite the value the client sent
+		// Round to 2 decimal places (currency)
+		subTotal = math.Round(subTotal*100) / 100
+
 		item.SubTotal = subTotal
 		grandTotal += subTotal
 	}
 
-	// Overwrite the value the client sent
-	bill.GrandTotal = grandTotal
+	// Also round the grand total for consistency
+	bill.GrandTotal = math.Round(grandTotal*100) / 100
 	return nil
 }
 
 // ---------- Generate PDF ----------
-func GeneratePDF(bill model.BillDetails, billID uint64) ([]byte, error) {
+func GeneratePDF(bill dto.BillDetails, billID uint64) ([]byte, error) {
 	f := gofpdf.New("P", "mm", "A4", "")
 	f.AddPage()
-	f.SetFont("Arial", "B", 16)
-
+	
+	// Add Ganesha image at the top
+	f.ImageOptions(
+		"assets/ganesha.png", // Image path
+		95,                   // X position (mm)
+		10,                   // Y position (mm)
+		20,                   // Width (mm)
+		20,                   // Height (mm)
+		false,                // Do not force page break
+		gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true,},
+		0, // Link
+		"",
+	)
+	
 	// Heading
+	f.SetY(32)
+	f.SetFont("Arial", "B", 16)
 	title := "Vinayaka Traders"
 	f.CellFormat(190, 10, title, "", 1, "C", false, 0, "")
 	f.Ln(5)
@@ -135,15 +152,15 @@ func GeneratePDF(bill model.BillDetails, billID uint64) ([]byte, error) {
 	// Table rows
 	f.SetFont("Arial", "", 10)
 	for _, item := range bill.BillItems {
-		f.CellFormat(15, 8, strconv.Itoa(item.SlNo), "1", 0, "C", false, 0, "")
-		f.CellFormat(58, 8, item.Item, "1", 0, "L", false, 0, "")
-		f.CellFormat(23, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "R", false, 0, "")
+		f.CellFormat(15, 8, strconv.Itoa(item.SlNo) + ".", "1", 0, "C", false, 0, "")
+		f.CellFormat(58, 8, item.Item, "1", 0, "C", false, 0, "")
+		f.CellFormat(23, 8, fmt.Sprintf("%.2f", item.MRPOrNet), "1", 0, "C", false, 0, "")
 		f.CellFormat(18, 8, strconv.Itoa(int(item.Quantity)), "1", 0, "C", false, 0, "")
 		// New column: SubTotal without discount = MRPOrNet * Quantity
 		subTotalNoDisc := item.MRPOrNet * float64(item.Quantity)
-		f.CellFormat(28, 8, fmt.Sprintf("%.2f", subTotalNoDisc), "1", 0, "R", false, 0, "")
+		f.CellFormat(28, 8, fmt.Sprintf("%.2f", subTotalNoDisc), "1", 0, "C", false, 0, "")
 		f.CellFormat(23, 8, item.Discount, "1", 0, "C", false, 0, "")
-		f.CellFormat(25, 8, fmt.Sprintf("%.2f", item.SubTotal), "1", 0, "R", false, 0, "")
+		f.CellFormat(25, 8, fmt.Sprintf("%.2f", item.SubTotal), "1", 0, "C", false, 0, "")
 		f.Ln(-1)
 	}
 

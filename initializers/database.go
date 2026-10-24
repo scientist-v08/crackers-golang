@@ -1,23 +1,26 @@
 package initializers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"github.com/scientist-v08/crackers/constants"
-	"github.com/scientist-v08/crackers/model"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/scientist-v08/crackers/db"
 )
 
-var DB *gorm.DB
-var Secret string
+var (
+	Pool    *pgxpool.Pool
+	Queries *db.Queries          // the sqlc generated one
+	Secret,Port  string
+)
 
 func ConnectToDb() {
-    var err error
+    ctx := context.Background()
 
-    dsn := fmt.Sprintf(
+	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
@@ -26,34 +29,38 @@ func ConnectToDb() {
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSLMODE"),
 	)
-    DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
-    if err != nil {
-        log.Fatal("Failed to connect to database")
-    }
-
-	Secret = os.Getenv("JWT_SECRET")
-
-	// AutoMigrate creates the table if it doesn't exist
-	err = DB.AutoMigrate(
-		&model.User{},
-		&model.Routes{},
-		&model.Billing{},
-		&model.Purchases{},
-		&model.Inventory{},
-		&model.Expense{},
-		&model.PriceList{},
-	)
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-    	log.Fatal("Failed to migrate database: ", err)
+		log.Fatal("Unable to parse database config:", err)
 	}
 
-	insertDefaultRoutes()
-	insertStandardPriceList()
-	insertSupremeArdAyyanPriceList()
+	// Reasonable defaults
+	config.MaxConns = 20
+	config.MinConns = 2
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MaxConnIdleTime = 5 * time.Minute
+
+	Pool, err = pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+
+	// Test the connection
+	if err := Pool.Ping(ctx); err != nil {
+		log.Fatal("Database ping failed:", err)
+	}
+
+	// Create the sqlc Queries object
+	Queries = db.New(Pool)
+
+	Secret = os.Getenv("JWT_SECRET")
+	Port = os.Getenv("PORT")
+
+	log.Println("Connected to database successfully (pgx + sqlc)")
 }
 
-func insertDefaultRoutes() {
+/*func insertDefaultRoutes() {
 	var count int64
 	DB.Model(&model.Routes{}).Count(&count)
 	if count == 6 {
@@ -186,4 +193,4 @@ func insertSupremeArdAyyanPriceList() {
 			log.Println("Supreme, ARD & Ayyan Price list inserted")
 		}
 	}
-}
+}*/

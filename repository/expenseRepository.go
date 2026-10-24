@@ -1,36 +1,43 @@
 package repository
 
 import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/scientist-v08/crackers/db"
 	"github.com/scientist-v08/crackers/dto"
 	"github.com/scientist-v08/crackers/initializers"
-	"github.com/scientist-v08/crackers/model"
 )
 
 func CreateExpenses(exp *dto.ExpenseReqBody) error {
-	expense := model.Expense{
-		ReasonForExpense: exp.ReasonForExpense,
-		Amount:           exp.Amount,
-	}
+	_, err := initializers.Queries.CreateExpense(context.Background(), db.CreateExpenseParams{
+		ReasonForExpense: pgtype.Text{
+			String: exp.ReasonForExpense,
+			Valid:  true,
+		},
+		Amount: pgtype.Int4{
+			Int32: exp.Amount,
+			Valid:  true,
+		},
+	})
 
-	if err := initializers.DB.Create(&expense).Error; err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func GetAllExpenses() ([]model.Expense, error) {
-	var resOfAllExpenses []model.Expense
-	if err := initializers.DB.Find(&resOfAllExpenses).Error; err != nil {
+func GetAllExpenses() ([]db.Expense, error) {
+	expenses, err := initializers.Queries.GetAllExpenses(context.Background())
+	if err != nil {
 		return nil, err
 	}
-	return resOfAllExpenses, nil
+
+	return expenses, nil
 }
 
 func GetAllExpensesTotalAmt() (int64, error) {
-	var totalAmt int64
-	if err := initializers.DB.Model(&model.Expense{}).Select("COALESCE(SUM(amount), 0)").Scan(&totalAmt).Error; err != nil {
+	totalAmt, err := initializers.Queries.GetAllExpensesTotalAmt(context.Background())
+	if err != nil {
 		return 0, err
 	}
+
 	return totalAmt, nil
 }
