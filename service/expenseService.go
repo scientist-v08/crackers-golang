@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/scientist-v08/crackers/db"
 	"github.com/scientist-v08/crackers/dto"
@@ -45,37 +44,24 @@ func CreateExpenseService(req dto.ExpenseReqBody) error {
 
 func GetAllExpenseService() (dto.GetExpenseRes, error) {
 	// 1. Create variables for obtaining errors and for go routines
-	var allExpensesErr, totalErr error
-	var wg sync.WaitGroup
+	var allExpensesErr error
 	var resOfAllExpenses []db.Expense
 	var totalAmount int64
 
-	wg.Add(2)
-
 	// 2. Obtain all the results
-	go func() {
-		defer wg.Done()
-		resOfAllExpenses, allExpensesErr = repository.GetAllExpenses()
-	}()
+	resOfAllExpenses, allExpensesErr = repository.GetAllExpenses()
 	
-	// 3. Finding the total budget
-	go func() {
-		defer wg.Done()
-		totalAmount, totalErr = repository.GetAllExpensesTotalAmt()
-	}()
-
-	// 4. Wait until both the go routines finish.
-	wg.Wait()
-	
-	// 5. Return any errors
+	// 3. Return any errors
 	if allExpensesErr != nil {
 		return dto.GetExpenseRes{}, allExpensesErr
 	}
-	if totalErr != nil {
-		return dto.GetExpenseRes{}, totalErr
+
+	// 4. Finding the total budget
+	for _, exp := range resOfAllExpenses {
+		totalAmount += int64(exp.Amount.Int32)
 	}
 
-	// 6. Map db.Expense → dto.Expense
+	// 5. Map db.Expense → dto.Expense
 	expenses := make([]dto.Expense, 0, len(resOfAllExpenses))
 	for _, e := range resOfAllExpenses {
 		expenses = append(expenses, dto.Expense{
@@ -85,6 +71,6 @@ func GetAllExpenseService() (dto.GetExpenseRes, error) {
 		})
 	}
 
-	// 7. Return results
+	// 6. Return results
 	return dto.GetExpenseRes{Expenses: expenses, Total: totalAmount}, nil
 }

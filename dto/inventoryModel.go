@@ -5,12 +5,12 @@ import (
 )
 
 type Inventory struct {
-	ID              uint64
-	BrandOrCompany  string
-	State           constants.InventoryState
-	Item            string
-	NumOfBoxes		int32
-	NumOfCartons    int32
-	PricePerCarton  int32
-	SubTotal        int32
+	ID             uint64                   `json:"id"`
+	BrandOrCompany string                   `json:"brandOrCompany"`
+	State          constants.InventoryState `json:"state"`
+	Item           string                   `json:"item"`
+	NumOfBoxes     int32                    `json:"numOfBoxes"`
+	NumOfCartons   int32                    `json:"numOfCartons"`
+	PricePerCarton int32                    `json:"pricePerCarton"`
+	SubTotal       int32                    `json:"subTotal"`
 }
