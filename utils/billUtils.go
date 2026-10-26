@@ -84,10 +84,10 @@ func GeneratePDF(bill dto.BillDetails, billID uint64) ([]byte, error) {
 	// Add Ganesha image at the top
 	f.ImageOptions(
 		"assets/ganesha.png", // Image path
-		95,                   // X position (mm)
+		100,                   // X position (mm)
 		10,                   // Y position (mm)
-		20,                   // Width (mm)
-		20,                   // Height (mm)
+		10,                   // Width (mm)
+		10,                   // Height (mm)
 		false,                // Do not force page break
 		gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true,},
 		0, // Link
@@ -95,7 +95,7 @@ func GeneratePDF(bill dto.BillDetails, billID uint64) ([]byte, error) {
 	)
 	
 	// Heading
-	f.SetY(32)
+	f.SetY(20)
 	f.SetFont("Arial", "B", 16)
 	title := "Vinayaka Traders"
 	f.CellFormat(190, 10, title, "", 1, "C", false, 0, "")
