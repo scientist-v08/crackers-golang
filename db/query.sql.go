@@ -285,6 +285,26 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteTempBillingByID = `-- name: DeleteTempBillingByID :exec
+DELETE FROM temp_billings
+WHERE id = $1
+`
+
+func (q *Queries) DeleteTempBillingByID(ctx context.Context, id int16) error {
+	_, err := q.db.Exec(ctx, deleteTempBillingByID, id)
+	return err
+}
+
+const deleteTempPurchasesByBillingID = `-- name: DeleteTempPurchasesByBillingID :exec
+DELETE FROM temp_purchases
+WHERE billing_id = $1
+`
+
+func (q *Queries) DeleteTempPurchasesByBillingID(ctx context.Context, billingID int16) error {
+	_, err := q.db.Exec(ctx, deleteTempPurchasesByBillingID, billingID)
+	return err
+}
+
 const findInventoryByID = `-- name: FindInventoryByID :one
 SELECT
     id,
@@ -517,6 +537,154 @@ func (q *Queries) GetAllPriceList(ctx context.Context) ([]PriceList, error) {
 			&i.Price,
 			&i.Item,
 			&i.Brand,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTempBillingByID = `-- name: GetTempBillingByID :one
+SELECT
+    id,
+    "user",
+    mobile,
+    comments,
+    grand_total,
+    finalized_amt
+FROM temp_billings
+WHERE id = $1
+`
+
+func (q *Queries) GetTempBillingByID(ctx context.Context, id int16) (TempBilling, error) {
+	row := q.db.QueryRow(ctx, getTempBillingByID, id)
+	var i TempBilling
+	err := row.Scan(
+		&i.ID,
+		&i.User,
+		&i.Mobile,
+		&i.Comments,
+		&i.GrandTotal,
+		&i.FinalizedAmt,
+	)
+	return i, err
+}
+
+const getTempBillingCommentsAndFinalizedByID = `-- name: GetTempBillingCommentsAndFinalizedByID :many
+SELECT
+    id,
+    comments,
+    finalized_amt
+FROM temp_billings
+`
+
+type GetTempBillingCommentsAndFinalizedByIDRow struct {
+	ID           int16
+	Comments     string
+	FinalizedAmt float64
+}
+
+func (q *Queries) GetTempBillingCommentsAndFinalizedByID(ctx context.Context) ([]GetTempBillingCommentsAndFinalizedByIDRow, error) {
+	rows, err := q.db.Query(ctx, getTempBillingCommentsAndFinalizedByID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTempBillingCommentsAndFinalizedByIDRow
+	for rows.Next() {
+		var i GetTempBillingCommentsAndFinalizedByIDRow
+		if err := rows.Scan(&i.ID, &i.Comments, &i.FinalizedAmt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertTempBilling = `-- name: InsertTempBilling :one
+INSERT INTO temp_billings (
+    "user",
+    mobile,
+    comments,
+    grand_total,
+    finalized_amt
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+RETURNING id
+`
+
+type InsertTempBillingParams struct {
+	User         string
+	Mobile       string
+	Comments     string
+	GrandTotal   float64
+	FinalizedAmt float64
+}
+
+func (q *Queries) InsertTempBilling(ctx context.Context, arg InsertTempBillingParams) (int16, error) {
+	row := q.db.QueryRow(ctx, insertTempBilling,
+		arg.User,
+		arg.Mobile,
+		arg.Comments,
+		arg.GrandTotal,
+		arg.FinalizedAmt,
+	)
+	var id int16
+	err := row.Scan(&id)
+	return id, err
+}
+
+type InsertTempPurchasesParams struct {
+	BillingID int16
+	Mobile    string
+	MrpOrNet  int32
+	Item      string
+	Quantity  int32
+	Discount  string
+	SubTotal  float64
+}
+
+const listTempPurchasesByBillingID = `-- name: ListTempPurchasesByBillingID :many
+SELECT
+    id,
+    billing_id,
+    mobile,
+    mrp_or_net,
+    item,
+    quantity,
+    discount,
+    sub_total
+FROM temp_purchases
+WHERE billing_id = $1
+ORDER BY id
+`
+
+func (q *Queries) ListTempPurchasesByBillingID(ctx context.Context, billingID int16) ([]TempPurchase, error) {
+	rows, err := q.db.Query(ctx, listTempPurchasesByBillingID, billingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TempPurchase
+	for rows.Next() {
+		var i TempPurchase
+		if err := rows.Scan(
+			&i.ID,
+			&i.BillingID,
+			&i.Mobile,
+			&i.MrpOrNet,
+			&i.Item,
+			&i.Quantity,
+			&i.Discount,
+			&i.SubTotal,
 		); err != nil {
 			return nil, err
 		}

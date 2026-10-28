@@ -46,3 +46,41 @@ func (r iteratorForCreatePurchases) Err() error {
 func (q *Queries) CreatePurchases(ctx context.Context, arg []CreatePurchasesParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"purchases"}, []string{"billing_id", "mobile", "mrp_or_net", "item", "quantity", "discount", "sub_total"}, &iteratorForCreatePurchases{rows: arg})
 }
+
+// iteratorForInsertTempPurchases implements pgx.CopyFromSource.
+type iteratorForInsertTempPurchases struct {
+	rows                 []InsertTempPurchasesParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertTempPurchases) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertTempPurchases) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].BillingID,
+		r.rows[0].Mobile,
+		r.rows[0].MrpOrNet,
+		r.rows[0].Item,
+		r.rows[0].Quantity,
+		r.rows[0].Discount,
+		r.rows[0].SubTotal,
+	}, nil
+}
+
+func (r iteratorForInsertTempPurchases) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertTempPurchases(ctx context.Context, arg []InsertTempPurchasesParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"temp_purchases"}, []string{"billing_id", "mobile", "mrp_or_net", "item", "quantity", "discount", "sub_total"}, &iteratorForInsertTempPurchases{rows: arg})
+}
