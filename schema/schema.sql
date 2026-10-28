@@ -84,3 +84,29 @@ CREATE TABLE price_lists (
     item TEXT,
     brand TEXT
 );
+
+CREATE TABLE IF NOT EXISTS temp_billings (
+    id              SMALLSERIAL PRIMARY KEY,
+    "user"          TEXT        NOT NULL DEFAULT '',
+    mobile          TEXT        NOT NULL DEFAULT '',
+    comments        TEXT        NOT NULL DEFAULT '',
+    grand_total     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    finalized_amt   DOUBLE PRECISION NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS temp_purchases (
+    id              SMALLSERIAL PRIMARY KEY,
+    billing_id      SMALLINT    NOT NULL
+                        REFERENCES temp_billings(id)
+                        ON UPDATE CASCADE
+                        ON DELETE CASCADE,
+    mobile          TEXT        NOT NULL DEFAULT '',
+    mrp_or_net      INTEGER     NOT NULL DEFAULT 0,
+    item            TEXT        NOT NULL DEFAULT '',
+    quantity        INTEGER     NOT NULL DEFAULT 0,
+    discount        TEXT        NOT NULL DEFAULT '',
+    sub_total       DOUBLE PRECISION NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_purchases_billing_id ON temp_purchases (billing_id);
+CREATE INDEX IF NOT EXISTS idx_temp_purchases_mobile     ON temp_purchases (mobile);

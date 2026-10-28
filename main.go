@@ -52,6 +52,7 @@ func main() {
 	routes.RegisterInventoryRoutes(r)
 	routes.RegisterExpenseRoutes(r)
 	routes.RegisterPriceList(r)
+	routes.RegisterTempRoutes(r)
 	
 	// Now run the application
 	r.Listen(":" + initializers.Port, fiber.ListenConfig{EnablePrefork: isProduction})

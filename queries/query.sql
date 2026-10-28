@@ -252,3 +252,68 @@ SELECT
     brand
 FROM price_lists
 ORDER BY brand, item;
+
+-- name: InsertTempBilling :one
+INSERT INTO temp_billings (
+    "user",
+    mobile,
+    comments,
+    grand_total,
+    finalized_amt
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+RETURNING id;
+
+-- name: InsertTempPurchases :copyfrom
+INSERT INTO temp_purchases (
+    billing_id,
+    mobile,
+    mrp_or_net,
+    item,
+    quantity,
+    discount,
+    sub_total
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+);
+
+-- name: GetTempBillingByID :one
+SELECT
+    id,
+    "user",
+    mobile,
+    comments,
+    grand_total,
+    finalized_amt
+FROM temp_billings
+WHERE id = $1;
+
+-- name: ListTempPurchasesByBillingID :many
+SELECT
+    id,
+    billing_id,
+    mobile,
+    mrp_or_net,
+    item,
+    quantity,
+    discount,
+    sub_total
+FROM temp_purchases
+WHERE billing_id = $1
+ORDER BY id;
+
+-- name: DeleteTempBillingByID :exec
+DELETE FROM temp_billings
+WHERE id = $1;
+
+-- name: DeleteTempPurchasesByBillingID :exec
+DELETE FROM temp_purchases
+WHERE billing_id = $1;
+
+-- name: GetTempBillingCommentsAndFinalizedByID :many
+SELECT
+    id,
+    comments,
+    finalized_amt
+FROM temp_billings;

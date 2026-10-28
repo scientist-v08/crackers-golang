@@ -58,6 +58,26 @@ type Route struct {
 	Role    string
 }
 
+type TempBilling struct {
+	ID           int16
+	User         string
+	Mobile       string
+	Comments     string
+	GrandTotal   float64
+	FinalizedAmt float64
+}
+
+type TempPurchase struct {
+	ID        int16
+	BillingID int16
+	Mobile    string
+	MrpOrNet  int32
+	Item      string
+	Quantity  int32
+	Discount  string
+	SubTotal  float64
+}
+
 type User struct {
 	ID        int64
 	CreatedAt pgtype.Timestamptz
